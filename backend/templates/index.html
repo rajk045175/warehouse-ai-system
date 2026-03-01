@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+      <meta charset="UTF-8">
+      <title>AI Warehouse Incident Reporter</title>
+      <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+      <style>
+            body {
+                  background: #0f1720;
+                  font-family: Arial;
+                  text-align: center;
+                  color: white;
+            }
+
+            .container {
+                  margin-top: 60px;
+            }
+
+            button {
+                  padding: 15px 30px;
+                  font-size: 18px;
+                  background: #ff4d4d;
+                  color: white;
+                  border: none;
+                  border-radius: 6px;
+                  cursor: pointer;
+            }
+
+            button:hover {
+                  background: #ff2b2b;
+            }
+
+            #resultBox {
+                  margin: 25px auto;
+                  width: 240px;
+                  padding: 18px;
+                  border-radius: 8px;
+                  font-size: 18px;
+                  display: none;
+            }
+
+            /* SMALL CHART BOX */
+            .chartBox {
+                  width: 260px;
+                  height: 180px;
+                  margin: 20px auto;
+                  background: white;
+                  border-radius: 10px;
+                  padding: 10px;
+            }
+
+            .chartBox canvas {
+                  width: 100% !important;
+                  height: 100% !important;
+            }
+      </style>
+
+</head>
+
+<body>
+
+      <div class="container">
+            <h1>🎤 AI Warehouse Incident Reporter</h1>
+            <h3>Press and Speak</h3>
+            <label>Select Language:</label>
+            <select id="langSelect">
+                  <option value="en-IN">English</option>
+                  <option value="ta-IN">Tamil</option>
+                  <option value="hi-IN">Hindi</option>
+                  <option value="te-IN">Telugu</option>
+                  <option value="ml-IN">Malayalam</option>
+                  <option value="kn-IN">Kannada</option>
+            </select>
+            <br><br>
+
+            <button id="recordBtn">Start Recording</button>
+            <div id="result" style="
+                margin-top:20px;
+                background:#22c55e;
+                color:white;
+                padding:15px;
+                border-radius:10px;
+                font-size:20px;
+                width:300px;
+                margin-left:auto;
+                margin-right:auto;">
+                  Waiting for voice input...
+            
+      </div>
+ <script>
+      const btn = document.getElementById("recordBtn");
+      const resultBox = document.getElementById("result");
+
+      let recognition;
+      let isListening = false;
+
+      btn.onclick = () => {
+
+            if (!('webkitSpeechRecognition' in window)) {
+                  alert("Use Google Chrome browser");
+                  return;
+            }
+
+            recognition = new webkitSpeechRecognition();
+           recognition.lang = document.getElementById("langSelect").value;
+            recognition.continuous = false;
+            recognition.interimResults = false;
+
+            btn.innerText = "Listening...";
+            isListening = true;
+
+            recognition.start();
+
+            // When speech detected
+            recognition.onresult = function (event) {
+
+                  let text = event.results[0][0].transcript;
+                  console.log("You said:", text);
+
+                  sendToServer(text);
+            };
+
+            // If user silent / mic stops
+            recognition.onend = function () {
+                  if (isListening) {
+                        btn.innerText = "Start Recording";
+                        isListening = false;
+                  }
+            };
+
+            recognition.onerror = function (e) {
+                  console.log("Mic error:", e);
+                  btn.innerText = "Start Recording";
+            };
+      };
+
+      function sendToServer(text) {
+
+            fetch("/report", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ text: text })
+            })
+                  .then(res => res.json())
+                  .then(data => {
+                        resultBox.innerHTML =
+                              "Priority:" + data.severity + "<br>Action:" + data.action;
+    });
+}
+</script>
+
+</body>
+
+</html>
