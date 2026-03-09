@@ -141,13 +141,14 @@ def predict():
 
     language = detect(text)
 
-    translated = GoogleTranslator(source="auto", target="en").translate(text)
+    translated = translate_to_english(text)
 
-    severity = "HIGH"
-    action = "Alert supervisor immediately"
+    severity, action = analyze_text(translated)
 
     save_incident(translated, severity, action)
+
     print("Sending Telegram:", severity)
+
     send_telegram_alert(severity, translated, action)
 
     return jsonify({
