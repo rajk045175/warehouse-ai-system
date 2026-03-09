@@ -99,13 +99,16 @@
 
       btn.onclick = () => {
 
-            if (!('webkitSpeechRecognition' in window)) {
-                  alert("Use Google Chrome browser");
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+            if (!SpeechRecognition) {
+                  alert("Speech Recognition not supported. Use Google Chrome.");
                   return;
             }
 
-            recognition = new webkitSpeechRecognition();
-           recognition.lang = document.getElementById("langSelect").value;
+            recognition = new SpeechRecognition();
+
+            recognition.lang = document.getElementById("langSelect").value;
             recognition.continuous = false;
             recognition.interimResults = false;
 
@@ -114,7 +117,6 @@
 
             recognition.start();
 
-            // When speech detected
             recognition.onresult = function (event) {
 
                   let text = event.results[0][0].transcript;
@@ -123,12 +125,9 @@
                   sendToServer(text);
             };
 
-            // If user silent / mic stops
             recognition.onend = function () {
-                  if (isListening) {
-                        btn.innerText = "Start Recording";
-                        isListening = false;
-                  }
+                  btn.innerText = "Start Recording";
+                  isListening = false;
             };
 
             recognition.onerror = function (e) {
@@ -139,7 +138,7 @@
 
       function sendToServer(text) {
 
-            fetch("/report", {
+            fetch("/predict", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({ text: text })
@@ -147,9 +146,9 @@
                   .then(res => res.json())
                   .then(data => {
                         resultBox.innerHTML =
-                              "Priority:" + data.severity + "<br>Action:" + data.action;
-    });
-}
+                              "Priority: " + data.severity + "<br>Action: " + data.action;
+                  });
+      }
 </script>
 
 </body>
