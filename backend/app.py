@@ -136,7 +136,8 @@ def home():
 @app.route("/predict", methods=["POST"])
 def predict():
 
-    text = request.form["text"]
+    data = request.get_json()
+    text = data["text"]
 
     language = detect(text)
 
