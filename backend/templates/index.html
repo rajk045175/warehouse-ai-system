@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-
 <html lang="en">
 
 <head>
       <meta charset="UTF-8">
       <title>AI Warehouse Incident Reporter</title>
+
       <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
       <style>
@@ -33,16 +33,18 @@
                   background: #ff2b2b;
             }
 
-            #resultBox {
-                  margin: 25px auto;
-                  width: 240px;
-                  padding: 18px;
-                  border-radius: 8px;
-                  font-size: 18px;
-                  display: none;
+            #result {
+                  margin-top: 20px;
+                  background: #22c55e;
+                  color: white;
+                  padding: 15px;
+                  border-radius: 10px;
+                  font-size: 20px;
+                  width: 300px;
+                  margin-left: auto;
+                  margin-right: auto;
             }
 
-            /* SMALL CHART BOX */
             .chartBox {
                   width: 260px;
                   height: 180px;
@@ -63,9 +65,13 @@
 <body>
 
       <div class="container">
+
             <h1>🎤 AI Warehouse Incident Reporter</h1>
+
             <h3>Press and Speak</h3>
+
             <label>Select Language:</label>
+
             <select id="langSelect">
                   <option value="en-IN">English</option>
                   <option value="ta-IN">Tamil</option>
@@ -74,82 +80,157 @@
                   <option value="ml-IN">Malayalam</option>
                   <option value="kn-IN">Kannada</option>
             </select>
+
             <br><br>
 
             <button id="recordBtn">Start Recording</button>
-            <div id="result" style="
-                margin-top:20px;
-                background:#22c55e;
-                color:white;
-                padding:15px;
-                border-radius:10px;
-                font-size:20px;
-                width:300px;
-                margin-left:auto;
-                margin-right:auto;">
+
+            <div id="result">
                   Waiting for voice input...
-            
+            </div>
+
+            <div class="chartBox">
+                  <canvas id="incidentChart"></canvas>
+            </div>
+
       </div>
- <script>
-      const btn = document.getElementById("recordBtn");
-      const resultBox = document.getElementById("result");
 
-      let recognition;
-      let isListening = false;
 
-      btn.onclick = () => {
+      <script>
 
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            const btn = document.getElementById("recordBtn");
+            const resultBox = document.getElementById("result");
 
-            if (!SpeechRecognition) {
-                  alert("Speech Recognition not supported. Use Google Chrome.");
-                  return;
+            let recognition;
+            let isListening = false;
+
+            btn.onclick = () => {
+
+                  const SpeechRecognition =
+                        window.SpeechRecognition || window.webkitSpeechRecognition;
+
+                  if (!SpeechRecognition) {
+                        alert("Speech Recognition not supported. Use Google Chrome.");
+                        return;
+                  }
+
+                  recognition = new SpeechRecognition();
+
+                  recognition.lang = document.getElementById("langSelect").value;
+                  recognition.continuous = false;
+                  recognition.interimResults = false;
+
+                  btn.innerText = "Listening...";
+                  isListening = true;
+
+                  recognition.start();
+
+                  recognition.onresult = function (event) {
+
+                        let text = event.results[0][0].transcript;
+
+                        console.log("You said:", text);
+
+                        sendToServer(text);
+
+                  };
+
+                  recognition.onend = function () {
+
+                        btn.innerText = "Start Recording";
+                        isListening = false;
+
+                  };
+
+                  recognition.onerror = function (e) {
+
+                        console.log("Mic error:", e);
+                        btn.innerText = "Start Recording";
+
+                  };
+
+            };
+
+
+            function sendToServer(text) {
+
+                  fetch("/predict", {
+
+                        method: "POST",
+
+                        headers: {
+                              "Content-Type": "application/json"
+                        },
+
+                        body: JSON.stringify({ text: text })
+
+                  })
+
+                        .then(res => res.json())
+
+                        .then(data => {
+
+                              resultBox.innerHTML =
+                                    "Priority: " + data.severity +
+                                    "<br>Action: " + data.action;
+
+                              loadIncidentStats();
+
+                        });
+
             }
 
-            recognition = new SpeechRecognition();
 
-            recognition.lang = document.getElementById("langSelect").value;
-            recognition.continuous = false;
-            recognition.interimResults = false;
 
-            btn.innerText = "Listening...";
-            isListening = true;
+            function loadIncidentStats() {
 
-            recognition.start();
+                  fetch("/incidents")
 
-            recognition.onresult = function (event) {
+                        .then(res => res.json())
 
-                  let text = event.results[0][0].transcript;
-                  console.log("You said:", text);
+                        .then(data => {
 
-                  sendToServer(text);
-            };
+                              let high = 0;
+                              let medium = 0;
+                              let low = 0;
 
-            recognition.onend = function () {
-                  btn.innerText = "Start Recording";
-                  isListening = false;
-            };
+                              data.forEach(i => {
 
-            recognition.onerror = function (e) {
-                  console.log("Mic error:", e);
-                  btn.innerText = "Start Recording";
-            };
-      };
+                                    if (i.severity === "HIGH") high++;
+                                    else if (i.severity === "MEDIUM") medium++;
+                                    else low++;
 
-      function sendToServer(text) {
+                              });
 
-            fetch("/predict", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ text: text })
-            })
-                  .then(res => res.json())
-                  .then(data => {
-                        resultBox.innerHTML =
-                              "Priority: " + data.severity + "<br>Action: " + data.action;
-                  });
-      }
-</script>
+                              const ctx = document.getElementById("incidentChart");
+
+                              new Chart(ctx, {
+
+                                    type: "pie",
+
+                                    data: {
+
+                                          labels: ["High", "Medium", "Low"],
+
+                                          datasets: [{
+
+                                                data: [high, medium, low],
+
+                                                backgroundColor: ["#ef4444", "#f59e0b", "#22c55e"]
+
+                                          }]
+
+                                    }
+
+                              });
+
+                        });
+
+            }
+
+            loadIncidentStats();
+
+      </script>
 
 </body>
 
