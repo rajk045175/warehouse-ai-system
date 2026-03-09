@@ -147,6 +147,8 @@ def predict():
     action = "Alert supervisor immediately"
 
     save_incident(translated, severity, action)
+    print("Sending Telegram:", severity)
+    send_telegram_alert(severity, translated, action)
 
     return jsonify({
         "severity": severity,
