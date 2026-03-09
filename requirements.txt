@@ -1,0 +1,6 @@
+Flask
+deep-translator
+langdetect
+requests
+scikit-learn
+gunicorn

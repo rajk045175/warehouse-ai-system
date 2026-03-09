@@ -24,9 +24,25 @@ def init_db():
 
     conn.commit()
     conn.close()
+    
+def get_db_connection():
+      conn = sqlite3.connect("incidents.db")
+      conn.row_factory = sqlite3.Row
+      return conn
+def save_incident(description, severity, action):
+
+      conn = get_db_connection()
+      cur = conn.cursor()
+
+      cur.execute("""
+    INSERT INTO incidents (description, severity, action)
+    VALUES (?, ?, ?)
+    """, (description, severity, action))
+
+      conn.commit()
+      conn.close()
 
 init_db()
-
 # ================= TELEGRAM ROUTER =================
 def send_telegram_alert(severity, text, action):
 
@@ -91,7 +107,7 @@ def analyze_text(text):
     HIGH_KEYWORDS = [
         "fire","flame","burn","burning","smoke","gas","explosion","blast",
         "injured","injury","bleeding","unconscious","fainted","accident",
-        "short circuit","sparking","shock","electrical shock","died","dead","hurt"
+        "short circuit","sparking","shock","electrical shock","died","dead","hurt","explosive"
     ]
 
     MEDIUM_KEYWORDS = [
@@ -117,57 +133,52 @@ def analyze_text(text):
 def home():
     return render_template("index.html")
 
-# receive voice text from website
-@app.route("/report", methods=["POST"])
-def report():
+@app.route("/predict", methods=["POST"])
+def predict():
 
-    data = request.get_json()
-    if not data:
-        return jsonify({"severity":"LOW","action":"No speech detected"})
+    text = request.form["text"]
 
-    # 1. Get speech text
-    text = data.get("text", "")
-    print("VOICE INPUT:", text)
+    language = detect(text)
 
-    # 2. Translate to English
-    text = translate_to_english(text)
-    print("AFTER TRANSLATION:", text)
+    translated = GoogleTranslator(source="auto", target="en").translate(text)
 
-    # 3. Analyze severity
-    severity, action = analyze_text(text)
-    print("DETECTED:", severity, action)
+    severity = "HIGH"
+    action = "Alert supervisor immediately"
 
-    # 4. Save in database
-    conn = sqlite3.connect("incidents.db")
-    cur = conn.cursor()
-    cur.execute(
-        "INSERT INTO incidents(description,severity,action) VALUES(?,?,?)",
-        (text, severity, action)
-    )
-    conn.commit()
-    conn.close()
+    save_incident(translated, severity, action)
 
-    # 5. Send telegram alert
-    send_telegram_alert(severity, text, action)
-
-    # 6. Always return JSON (VERY IMPORTANT)
-    return jsonify({"severity": severity, "action": action})
-    
+    return jsonify({
+        "severity": severity,
+        "action": action
+    })
 
 
 # get all incidents (for graph later)
 @app.route("/incidents")
 def incidents():
+
     conn = sqlite3.connect("incidents.db")
+    conn.row_factory = sqlite3.Row
     cur = conn.cursor()
+
     cur.execute("SELECT * FROM incidents ORDER BY id DESC")
     rows = cur.fetchall()
+
     conn.close()
 
-    return jsonify(rows)
+    incidents_list = []
 
+    for row in rows:
+        incidents_list.append({
+            "id": row["id"],
+            "description": row["description"],
+            "severity": row["severity"],
+            "action": row["action"]
+        })
+
+    return jsonify(incidents_list)
 
 
 # ================= RUN SERVER =================
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(host="0.0.0.0")
